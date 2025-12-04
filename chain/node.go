@@ -2,6 +2,8 @@ package chain
 
 import (
 	"regexp"
+	"sync/atomic"
+	"time"
 
 	"github.com/go-gost/core/auth"
 	"github.com/go-gost/core/bypass"
@@ -132,10 +134,12 @@ func PriorityNodeOption(priority int) NodeOption {
 }
 
 type Node struct {
-	Name    string
-	Addr    string
-	marker  selector.Marker
-	options NodeOptions
+	Name        string
+	Addr        string
+	marker      selector.Marker
+	options     NodeOptions
+	activeConns int64
+	latency     int64
 }
 
 func NewNode(name string, addr string, opts ...NodeOption) *Node {
@@ -172,4 +176,24 @@ func (node *Node) Copy() *Node {
 	n := &Node{}
 	*n = *node
 	return n
+}
+
+func (node *Node) ActiveConns() int64 {
+	return atomic.LoadInt64(&node.activeConns)
+}
+
+func (node *Node) IncActiveConns() {
+	atomic.AddInt64(&node.activeConns, 1)
+}
+
+func (node *Node) DecActiveConns() {
+	atomic.AddInt64(&node.activeConns, -1)
+}
+
+func (node *Node) Latency() time.Duration {
+	return time.Duration(atomic.LoadInt64(&node.latency))
+}
+
+func (node *Node) SetLatency(d time.Duration) {
+	atomic.StoreInt64(&node.latency, int64(d))
 }
